@@ -36,6 +36,7 @@
         }
     </script>
     
+    
     <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -66,10 +67,11 @@
 </head>
 <body class="min-h-screen py-8 px-4 md:px-8">
 
-    <div class="max-w-4xl mx-auto bg-white min-h-[90vh] shadow-sm border border-gray-200 rounded-xl overflow-hidden">
+    <!-- PERUBAHAN: Menghapus 'overflow-hidden' agar sticky header berfungsi terhadap body scroll. -->
+    <div class="max-w-4xl mx-auto bg-white min-h-[90vh] shadow-sm border border-gray-200 rounded-xl">
         
-        <!-- HEADER SECTION -->
-        <div class="bg-gray-100/50 p-8 border-b border-gray-200">
+        <!-- HEADER SECTION - Ditambahkan sticky, top-0, z-10, dan backdrop-blur untuk efek buram saat menggulir -->
+        <div class="bg-gray-100/90 p-8 border-b border-gray-200 sticky top-0 z-10 backdrop-blur-sm">
             <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight mb-6">
                 Ultimate Gemini & Nano Banana Prompt Collection
             </h1>
@@ -105,7 +107,8 @@
         <!-- Loading & Status -->
         <div id="loading-indicator" class="hidden py-8 text-center text-gray-500">
             <span class="inline-flex items-center">
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 Memuat data...
             </span>
         </div>
