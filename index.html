@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultimate Gemini & Nano Banana Prompt Collection</title>
     <!-- Tailwind CSS -->
-    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -37,10 +37,10 @@
     </script>
     
     
-    <!-- FileSaver.js (Tidak diperlukan Supabase CDN lagi) -->
-    <script src="[https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js](https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js)"></script>
+    <!-- FileSaver untuk download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
-    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap)" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <style>
         body {
@@ -62,11 +62,20 @@
             background-color: #d1d5db;
             border-radius: 3px;
         }
+        
+        /* Animation for items when loading */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
     </style>
 </head>
 <body class="min-h-screen py-8 px-4 md:px-8">
 
-    <!-- PERUBAHAN: Menghapus 'overflow-hidden' agar sticky header berfungsi terhadap body scroll. -->
+    <!-- Kontainer utama -->
     <div class="max-w-4xl mx-auto bg-white min-h-[90vh] shadow-sm border border-gray-200 rounded-xl">
         
         <!-- HEADER SECTION - Ditambahkan sticky, top-0, z-10, dan backdrop-blur untuk efek buram saat menggulir -->
@@ -101,12 +110,13 @@
         <!-- MAIN CONTENT LIST -->
         <div id="prompt-list-container" class="p-8 space-y-12">
             <!-- Prompt Items will be injected here -->
+            <p class="text-center text-gray-400 py-10">Memuat data dari Cloudflare Worker...</p>
         </div>
 
         <!-- Loading & Status -->
         <div id="loading-indicator" class="hidden py-8 text-center text-gray-500">
             <span class="inline-flex items-center">
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 Memuat data...
             </span>
@@ -135,12 +145,15 @@
 
     <!-- JAVASCRIPT -->
     <script>
-        // PERUBAHAN: Hapus konfigurasi Supabase dari Frontend.
-        // Konfigurasi ini sekarang ditangani di Cloudflare Worker.
-        
-        // --- KONFIGURASI WORKER API ---
-        const WORKER_API_ENDPOINT = '/api/prompts'; 
-        // Worker akan menangani /api/prompts?query=... atau /api/prompts?from=...&to=...
+        // =========================================================================
+        // PENTING: KONFIGURASI WORKER API
+        // Ganti URL ini dengan URL Cloudflare Worker Anda (misalnya: https://nama-worker.user.workers.dev)
+        // Jika Anda menggunakan Pages Redirects, cukup gunakan '/api/prompts'
+        // Jika tidak, gunakan URL lengkap Worker Anda.
+        //const WORKER_API_ENDPOINT = '/api/prompts'; // Gunakan ini jika Pages Redirects dikonfigurasi.
+        //const WORKER_API_ENDPOINT = 'https://[nama-worker].[user].workers.dev/api/prompts'; // Gunakan ini jika tidak ada Redirects.
+        const WORKER_API_ENDPOINT = 'https://sampletask.helenaliuw.workers.dev/prompts';
+
 
         // --- STATE ---
         const PAGE_SIZE = 10; 
@@ -148,7 +161,7 @@
         let isLoading = false;
         let hasMore = true;
         let allPromptsData = []; 
-        let isSearching = false; // State baru untuk mengelola mode pencarian
+        let isSearching = false; 
         
         // --- DOM ELEMENTS ---
         const promptListContainer = document.getElementById('prompt-list-container');
@@ -158,9 +171,7 @@
         // INITIALIZATION
         // =========================================================================
         window.onload = () => {
-            // TIDAK PERLU inisialisasi Supabase di sini lagi
-            
-            // Observers & Events
+            // Kita tidak perlu inisialisasi Supabase di sini lagi!
             setupIntersectionObserver();
             // Event listener untuk tombol ENTER pada input pencarian
             searchInput.addEventListener('keydown', handleSearchKeydown); 
@@ -170,7 +181,7 @@
         };
 
         // =========================================================================
-        // SEARCH AND FILTER LOGIC
+        // SEARCH AND FILTER LOGIC (MENGGUNAKAN WORKER)
         // =========================================================================
         
         /**
@@ -181,21 +192,22 @@
             if (event.key === 'Enter') {
                 event.preventDefault(); 
                 const query = searchInput.value;
-                searchPrompts(query); // Ganti ke fungsi baru
+                searchPromptsInDatabase(query);
             }
         }
         
         /**
-         * Melakukan pencarian data melalui Cloudflare Worker.
+         * Melakukan pencarian data dengan memanggil Worker.
          * @param {string} query - Kata kunci pencarian.
          */
-        async function searchPrompts(query) {
+        async function searchPromptsInDatabase(query) {
             const term = query.toLowerCase().trim();
             if (term === '') {
                 clearSearch();
                 return;
             }
 
+            // Masuk mode pencarian
             isSearching = true;
             promptListContainer.innerHTML = '';
             document.getElementById('loading-indicator').classList.remove('hidden');
@@ -203,14 +215,14 @@
             document.getElementById('end-message').classList.add('hidden');
 
             try {
-                // PERUBAHAN: Ganti koneksi Supabase langsung dengan fetch ke Worker
-                const response = await fetch(`${WORKER_API_ENDPOINT}?query=${encodeURIComponent(term)}`);
+                // Panggil Worker dengan parameter query
+                const url = `${WORKER_API_ENDPOINT}?query=${encodeURIComponent(term)}`;
+                const response = await fetch(url);
+                const data = await response.json();
                 
                 if (!response.ok) {
-                    throw new Error(`Worker API Error: ${response.statusText}`);
+                    throw new Error(data.error || 'Terjadi kesalahan saat mencari.');
                 }
-                
-                const data = await response.json();
 
                 allPromptsData = data; 
                 renderAllPrompts();
@@ -219,12 +231,13 @@
                      promptListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Tidak ditemukan prompt yang cocok dengan kata kunci: "${term}".</p>`;
                 } 
                 
+                // Tampilkan pesan hasil pencarian dan matikan infinite scroll secara permanen
                 document.getElementById('end-message').classList.remove('hidden'); 
                 document.getElementById('end-message').textContent = `--- Ditemukan ${data.length} hasil untuk "${term}" ---`;
 
             } catch (err) {
-                console.error('Search Prompts Error:', err);
-                displayMessage('Gagal melakukan pencarian melalui API Worker.', 'error');
+                console.error('Database Search Error:', err);
+                displayMessage(`Gagal melakukan pencarian: ${err.message}`, 'error');
             } finally {
                 document.getElementById('loading-indicator').classList.add('hidden');
             }
@@ -255,11 +268,8 @@
 
 
         // =========================================================================
-        // DATA FETCHING (INFINITE SCROLL)
+        // DATA FETCHING (INFINITE SCROLL MENGGUNAKAN WORKER)
         // =========================================================================
-        /**
-         * Memuat prompt untuk infinite scroll dari Cloudflare Worker.
-         */
         async function loadPrompts() {
             // Hentikan eksekusi jika sedang memuat, tidak ada lagi data, atau sedang dalam mode pencarian
             if (isLoading || !hasMore || isSearching) return;
@@ -271,14 +281,14 @@
             const to = loadedCount + PAGE_SIZE - 1; 
 
             try {
-                // PERUBAHAN: Panggil Worker API untuk pagination
-                const response = await fetch(`${WORKER_API_ENDPOINT}?from=${from}&to=${to}`);
-                
+                // Panggil Worker dengan parameter range/pagination
+                const url = `${WORKER_API_ENDPOINT}?from=${from}&to=${to}`;
+                const response = await fetch(url);
+                const prompts = await response.json(); 
+
                 if (!response.ok) {
-                    throw new Error(`Worker API Error: ${response.statusText}`);
+                    throw new Error(prompts.error || 'Gagal mengambil data dari worker.');
                 }
-                
-                const prompts = await response.json();
 
                 if (prompts.length === 0 && loadedCount === 0) {
                      // Jika tidak ada data sama sekali
@@ -288,14 +298,19 @@
                     hasMore = false;
                     document.getElementById('end-message').classList.remove('hidden');
                 } else {
-                    // Gabungkan data baru ke data global
+                    // Hanya bersihkan kontainer jika ini adalah pemuatan awal (loadedCount === 0)
+                    if (loadedCount === 0) {
+                        promptListContainer.innerHTML = '';
+                    }
+
+                    // Gabungkan data baru ke data global dan render
                     prompts.forEach(prompt => {
                         if (!allPromptsData.some(p => p.id === prompt.id)) {
                              allPromptsData.push(prompt); 
+                             // Hanya tambahkan yang baru ke DOM
+                             promptListContainer.insertAdjacentHTML('beforeend', getPromptItemHtml(prompt));
                         }
                     });
-
-                    renderAllPrompts(); // Render semua data yang ada
                     
                     loadedCount += prompts.length;
                     if (prompts.length < PAGE_SIZE) { 
@@ -305,7 +320,7 @@
                 }
             } catch (err) {
                 console.error('Load Prompts Error:', err);
-                displayMessage('Gagal memuat daftar prompt dari API Worker.', 'error');
+                displayMessage(`Gagal memuat daftar prompt: ${err.message}`, 'error');
             } finally {
                 isLoading = false;
                 document.getElementById('loading-indicator').classList.add('hidden');
@@ -315,15 +330,19 @@
         // =========================================================================
         // RENDERING UI
         // =========================================================================
+        // Fungsi rendering tetap sama, hanya memproses data yang sudah ada di allPromptsData.
         function renderAllPrompts() {
             // Bersihkan kontainer jika ini adalah inisialisasi atau pencarian baru
             if (loadedCount === 0 || isSearching) {
                 promptListContainer.innerHTML = ''; 
             }
             
-            if (allPromptsData.length === 0 && searchInput.value.trim() !== '') {
+            if (allPromptsData.length === 0 && searchInput.value.trim() !== '' && isSearching) {
                 // Pesan 'Tidak ditemukan hasil' sudah ditangani di searchPromptsInDatabase
                 return;
+            } else if (allPromptsData.length === 0) {
+                 promptListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Belum ada prompt dalam koleksi.</p>`;
+                 return;
             }
 
             allPromptsData.forEach(prompt => {
@@ -344,7 +363,7 @@
             const tagsString = prompt.tags || '';
             const tags = tagsString.split(',').map(t => t.trim()).filter(t => t.length > 0);
             // Tombol tag sekarang memicu pencarian DB
-            const tagsHtml = tags.map(tag => `<span class="mr-2 cursor-pointer hover:text-blue-600 hover:underline" onclick="searchPrompts('${tag}'); searchInput.value = '${tag}'; window.scrollTo(0,0);">#${tag}</span>`).join('');
+            const tagsHtml = tags.map(tag => `<span class="mr-2 cursor-pointer hover:text-blue-600 hover:underline" onclick="searchPromptsInDatabase('${tag}'); searchInput.value = '${tag}'; window.scrollTo(0,0);">#${tag}</span>`).join('');
 
             // Escaping content for JS safety
             const escapedContent = prompt.content.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
