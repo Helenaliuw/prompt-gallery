@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultimate Gemini & Nano Banana Prompt Collection</title>
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -37,11 +37,10 @@
     </script>
     
     
-    <!-- Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <!-- FileSaver.js (Tidak diperlukan Supabase CDN lagi) -->
+    <script src="[https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js](https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js)"></script>
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap)" rel="stylesheet">
     
     <style>
         body {
@@ -107,7 +106,7 @@
         <!-- Loading & Status -->
         <div id="loading-indicator" class="hidden py-8 text-center text-gray-500">
             <span class="inline-flex items-center">
-                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-500" xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 Memuat data...
             </span>
@@ -136,12 +135,13 @@
 
     <!-- JAVASCRIPT -->
     <script>
-        // --- KONFIGURASI SUPABASE ---
-        const SUPABASE_URL = 'https://blgnsemdwyolktqbigfm.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsZ25zZW1kd3lvbGt0cWJpZ2ZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ5MzY0MTQsImV4cCI6MjA4MDUxMjQxNH0.Kd0TtDzeA9M_25L01dc7rTLY2CHgtqIBih4TSqSybNU'; 
+        // PERUBAHAN: Hapus konfigurasi Supabase dari Frontend.
+        // Konfigurasi ini sekarang ditangani di Cloudflare Worker.
         
-        let supabaseClient;
-        
+        // --- KONFIGURASI WORKER API ---
+        const WORKER_API_ENDPOINT = '/api/prompts'; 
+        // Worker akan menangani /api/prompts?query=... atau /api/prompts?from=...&to=...
+
         // --- STATE ---
         const PAGE_SIZE = 10; 
         let loadedCount = 0;
@@ -158,21 +158,15 @@
         // INITIALIZATION
         // =========================================================================
         window.onload = () => {
-            try {
-                // Inisialisasi Supabase
-                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                
-                // Observers & Events
-                setupIntersectionObserver();
-                // Event listener untuk tombol ENTER pada input pencarian
-                searchInput.addEventListener('keydown', handleSearchKeydown); 
-                
-                // Load Data
-                loadPrompts(); 
-            } catch (e) {
-                console.error('Supabase Init Error:', e);
-                displayMessage('Gagal menginisialisasi Supabase.', 'error');
-            }
+            // TIDAK PERLU inisialisasi Supabase di sini lagi
+            
+            // Observers & Events
+            setupIntersectionObserver();
+            // Event listener untuk tombol ENTER pada input pencarian
+            searchInput.addEventListener('keydown', handleSearchKeydown); 
+            
+            // Load Data
+            loadPrompts(); 
         };
 
         // =========================================================================
@@ -187,22 +181,21 @@
             if (event.key === 'Enter') {
                 event.preventDefault(); 
                 const query = searchInput.value;
-                searchPromptsInDatabase(query);
+                searchPrompts(query); // Ganti ke fungsi baru
             }
         }
         
         /**
-         * Melakukan pencarian langsung ke database Supabase.
+         * Melakukan pencarian data melalui Cloudflare Worker.
          * @param {string} query - Kata kunci pencarian.
          */
-        async function searchPromptsInDatabase(query) {
+        async function searchPrompts(query) {
             const term = query.toLowerCase().trim();
             if (term === '') {
                 clearSearch();
                 return;
             }
 
-            // Masuk mode pencarian
             isSearching = true;
             promptListContainer.innerHTML = '';
             document.getElementById('loading-indicator').classList.remove('hidden');
@@ -210,14 +203,14 @@
             document.getElementById('end-message').classList.add('hidden');
 
             try {
-                // Query ke Supabase menggunakan `ilike` dengan operator `or`
-                const { data, error } = await supabaseClient
-                    .from('prompts')
-                    .select('*, images(*)')
-                    .or(`title.ilike.%${term}%,content.ilike.%${term}%,tags.ilike.%${term}%`)
-                    .order('created_at', { ascending: false });
-
-                if (error) throw error;
+                // PERUBAHAN: Ganti koneksi Supabase langsung dengan fetch ke Worker
+                const response = await fetch(`${WORKER_API_ENDPOINT}?query=${encodeURIComponent(term)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Worker API Error: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
 
                 allPromptsData = data; 
                 renderAllPrompts();
@@ -226,13 +219,12 @@
                      promptListContainer.innerHTML = `<p class="text-center text-gray-500 py-10">Tidak ditemukan prompt yang cocok dengan kata kunci: "${term}".</p>`;
                 } 
                 
-                // Tampilkan pesan hasil pencarian dan matikan infinite scroll secara permanen
                 document.getElementById('end-message').classList.remove('hidden'); 
                 document.getElementById('end-message').textContent = `--- Ditemukan ${data.length} hasil untuk "${term}" ---`;
 
             } catch (err) {
-                console.error('Database Search Error:', err);
-                displayMessage('Gagal melakukan pencarian di database.', 'error');
+                console.error('Search Prompts Error:', err);
+                displayMessage('Gagal melakukan pencarian melalui API Worker.', 'error');
             } finally {
                 document.getElementById('loading-indicator').classList.add('hidden');
             }
@@ -265,6 +257,9 @@
         // =========================================================================
         // DATA FETCHING (INFINITE SCROLL)
         // =========================================================================
+        /**
+         * Memuat prompt untuk infinite scroll dari Cloudflare Worker.
+         */
         async function loadPrompts() {
             // Hentikan eksekusi jika sedang memuat, tidak ada lagi data, atau sedang dalam mode pencarian
             if (isLoading || !hasMore || isSearching) return;
@@ -276,13 +271,14 @@
             const to = loadedCount + PAGE_SIZE - 1; 
 
             try {
-                const { data: prompts, error } = await supabaseClient
-                    .from('prompts')
-                    .select('*, images(*)')
-                    .order('created_at', { ascending: false })
-                    .range(from, to); 
-
-                if (error) throw error;
+                // PERUBAHAN: Panggil Worker API untuk pagination
+                const response = await fetch(`${WORKER_API_ENDPOINT}?from=${from}&to=${to}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Worker API Error: ${response.statusText}`);
+                }
+                
+                const prompts = await response.json();
 
                 if (prompts.length === 0 && loadedCount === 0) {
                      // Jika tidak ada data sama sekali
@@ -309,7 +305,7 @@
                 }
             } catch (err) {
                 console.error('Load Prompts Error:', err);
-                displayMessage('Gagal memuat daftar prompt.', 'error');
+                displayMessage('Gagal memuat daftar prompt dari API Worker.', 'error');
             } finally {
                 isLoading = false;
                 document.getElementById('loading-indicator').classList.add('hidden');
@@ -348,7 +344,7 @@
             const tagsString = prompt.tags || '';
             const tags = tagsString.split(',').map(t => t.trim()).filter(t => t.length > 0);
             // Tombol tag sekarang memicu pencarian DB
-            const tagsHtml = tags.map(tag => `<span class="mr-2 cursor-pointer hover:text-blue-600 hover:underline" onclick="searchPromptsInDatabase('${tag}'); searchInput.value = '${tag}'; window.scrollTo(0,0);">#${tag}</span>`).join('');
+            const tagsHtml = tags.map(tag => `<span class="mr-2 cursor-pointer hover:text-blue-600 hover:underline" onclick="searchPrompts('${tag}'); searchInput.value = '${tag}'; window.scrollTo(0,0);">#${tag}</span>`).join('');
 
             // Escaping content for JS safety
             const escapedContent = prompt.content.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
